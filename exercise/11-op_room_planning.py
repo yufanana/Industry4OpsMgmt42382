@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """
 Program to implement operation room planning based on C1-heuristic taught in 
 course Industry 4.0 in Industry Operations.
@@ -11,7 +12,7 @@ import numpy as np
 
 
 class OpRoom:
-    def __init__(self, id_: int, open: float, close: float):
+    def __init__(self, id_: int, open: float, close: float) -> None:
         self.id = id_
         self.open = open
         self.close = close
@@ -27,7 +28,7 @@ class OpRoom:
 
 
 class Patient:
-    def __init__(self, id_: int, duration: float, op_room: OpRoom):
+    def __init__(self, id_: int, duration: float, op_room: OpRoom) -> None:
         self.id = id_
         self.duration = duration
         self.op_room = op_room
@@ -36,9 +37,12 @@ class Patient:
 
 
 class OpRoomPlanning:
+    """
+    Class to implement C1 or C2-heuristic for operation room planning.
+    """
     def __init__(self, op_ids: list[int], open_times: list[float],
                  close_times: list[float], p_ids: list[int],
-                 p_durations: list[float], p_op_rooms: list[int]):
+                 p_durations: list[float], p_op_rooms: list[int]) -> None:
 
         self.patients: list[Patient] = []
         self.scheduled: list[Patient] = []
@@ -48,7 +52,7 @@ class OpRoomPlanning:
         self.generate_op_rooms(op_ids, open_times, close_times)
         self.generate_patients(p_ids, p_durations, p_op_rooms)
 
-    def generate_op_rooms(self, op_ids, open_times, close_times):
+    def generate_op_rooms(self, op_ids, open_times, close_times) -> None:
         """
         Generate a list of OpRoom objects to store in self.op_rooms.
         """
@@ -63,7 +67,7 @@ class OpRoomPlanning:
             op_rooms.append(op_room)
         self.op_rooms = op_rooms
 
-    def generate_patients(self, p_ids, p_durations, p_op_rooms):
+    def generate_patients(self, p_ids, p_durations, p_op_rooms) -> None:
         """
         Generate a list of Patients objects to store in self.patients.
         """
@@ -96,7 +100,7 @@ class OpRoomPlanning:
         self.L = (e-s)/(1+temp)
         print(f"Lambda: {self.L}")
 
-    def latest_complete_time(self):
+    def latest_complete_time(self) -> float:
         """
         Returns latest possible completion time among all ORs.
         """
@@ -106,7 +110,7 @@ class OpRoomPlanning:
                 latest_c = or_.next_start
         return latest_c
 
-    def earliest_start_time(self):
+    def earliest_start_time(self) -> float:
         """
         Returns earliest possible start time among all ORs.
         """
@@ -116,9 +120,9 @@ class OpRoomPlanning:
                 earliest_s = or_.next_end
         return earliest_s
 
-    def forward_schedule(self, latest_c):
+    def forward_schedule(self, latest_c) -> None:
         """
-        Forward schedule a patient in its OR.
+        Forward schedule a patient in its OR for C1-heuristic.
         """
         # Calculate deviations
         f_dels = []
@@ -141,9 +145,9 @@ class OpRoomPlanning:
         print(f"Forward scheduled patient {p.id}")
         self.patients.pop(min_f_del)
 
-    def backward_schedule(self, earliest_s):
+    def backward_schedule(self, earliest_s) -> None:
         """
-        Backward schedule a patient in its OR.
+        Backward schedule a patient in its OR for C1-heuristic.
         """
         # Calculate deviations
         b_dels = []
@@ -166,21 +170,23 @@ class OpRoomPlanning:
         print(f"Backward scheduled patient {p.id}")
         self.patients.pop(min_b_del)
 
-    def generate_c1_results(self):
+    def print_c1_results(self) -> None:
         """
-        Print start and end times for each patient in each OR.
+        Print start and end times for each patient in each OR for C1-heuristic.
         """
         print("\n\nFinal Planning Sequence:")
         for or_ in self.op_rooms:
             print(f"OR: {or_.id}\tid [start  end ]")
             for p in or_.f_scheduled:
                 print(f"\t {p.id} [{p.start_time:5} {p.complete_time:5}]")
+                or_.scheduled.append(p)
             for p in reversed(or_.b_scheduled):
                 print(f"\t {p.id} [{p.start_time:5} {p.complete_time:5}]")
+                or_.scheduled.append(p)
 
-    def generate_c2_results(self):
+    def print_c2_results(self) -> None:
         """
-        Print start and end times for each patient in each OR.
+        Print start and end times for each patient in each OR for C2-heuristic.
         """
         print("\nPlanning Sequence:")
         for or_ in self.op_rooms:
@@ -188,7 +194,29 @@ class OpRoomPlanning:
             for p in or_.scheduled:
                 print(f"\t {p.id} [{p.start_time:5} {p.complete_time:5}]")
 
-    def c1_heuristic(self):
+    def print_bim_bii(self) -> None:
+        """
+        Calculate the break-in moments and break-in intervals from the schedule.
+        """
+        print("\nBreak-in Moments:")
+        bim = []
+        for or_ in self.op_rooms:
+            for p in or_.scheduled:
+                bim.append(p.start_time)
+                bim.append(p.complete_time)
+        bim = sorted(np.unique(bim))    # sort ascending
+        print(f"\t{bim}")
+
+        bii = []
+        for i in range(len(bim)-1):
+            bii.append(bim[i+1] - bim[i])
+        bii_avg = sum(bii)/len(bii)
+        print(f"\nBreak-in Interval: {bii_avg:.3f}\n")
+
+    def c1_heuristic(self) -> None:
+        """
+        Main implementation loop for C1-heuristic.
+        """
         iteration = 0
         self.calculate_lambda()
 
@@ -206,9 +234,14 @@ class OpRoomPlanning:
             if len(self.patients) > 0:
                 self.backward_schedule(earliest_s)
 
-        self.generate_c1_results()
+        self.print_c1_results()
+        self.print_bim_bii()
 
     def find_largest_or(self) -> OpRoom:
+        """
+        Find the Op Room with the most number of patients left unscheduled 
+        for C2-heuristic.
+        """
         max_n = 0
         max_or = None
         for or_ in self.op_rooms:
@@ -217,7 +250,11 @@ class OpRoomPlanning:
                 max_n = len(or_.patients)
         return max_or
 
-    def c2_step_1(self):
+    def c2_step_1(self) -> None:
+        """
+        Schedule all patients in the largest OR using the shortest processing 
+        time rule (SPT) for C2-heuristic.
+        """
         max_or = self.find_largest_or()
 
         # Schedule all patients using SPT rule
@@ -230,7 +267,10 @@ class OpRoomPlanning:
             self.pop_patient(self.patients, p)
             self.scheduled.append(p)
 
-    def pop_patient(self, list_: list[Patient], patient: Patient):
+    def pop_patient(self, list_: list[Patient], patient: Patient) -> None:
+        """
+        Remove the patient from list_ based on matching IDs.
+        """        
         for i, p in enumerate(list_):
             if p.id == patient.id:
                 list_.pop(i)
@@ -238,15 +278,23 @@ class OpRoomPlanning:
         print(f"Unable to pop patient {patient.id}")
         exit()
 
-    def get_invalid_intervals(self):
+    def calculate_invalid_intervals(self):
+        """
+        Return the intervals of +- lambda/2 from each of the already scheduled
+        patients in C2-heuristic.
+        """
         intervals = []
         for p in self.scheduled:
-            interval = [round(p.complete_time-self.L/2, 2),
-                        round(p.complete_time+self.L/2)]
+            interval = (round(p.complete_time-self.L/2, 2),
+                        round(p.complete_time+self.L/2))
             intervals.append(interval)
         return intervals
 
     def check_valid_end(self, end) -> bool:
+        """
+        Check if the end time lies within +- lambda/2 range of any of the already
+        scheduled patients in C2-heuristic.
+        """
         valid = True
         for p in self.scheduled:
             # Check if end lies in the valid interval
@@ -256,7 +304,11 @@ class OpRoomPlanning:
                 return valid
         return valid
 
-    def get_min_abs_diff(self, p: Patient):
+    def calculate_min_abs_diff(self, p: Patient) -> float:
+        """
+        Return the minimum absolute difference between the end time of 
+        unscheduled patient and all the scheduled patients in C2-heuristic. 
+        """
         differences = []
         end = p.op_room.next_start + p.duration
         for p_scheduled in self.scheduled:
@@ -266,7 +318,7 @@ class OpRoomPlanning:
         min = differences[np.argmin(differences)]
         return min
 
-    def c2_schedule_patient(self, p: Patient):
+    def c2_schedule_patient(self, p: Patient) -> None:
         p.op_room.scheduled.append(p)
         self.scheduled.append(p)
         print(f"\tScheduled patient {p.id} in OR {p.op_room.id}")
@@ -276,7 +328,7 @@ class OpRoomPlanning:
         p.complete_time = p.start_time + p.duration
         p.op_room.next_start = p.complete_time
 
-    def c2_iterate(self):
+    def c2_iterate(self) -> None:
         max_or = self.find_largest_or()
         sorted_p = sorted(max_or.patients, key=lambda p: p.duration)
         print(f"\tPatients left in OR {max_or.id}: {[p.id for p in sorted_p]}")
@@ -294,7 +346,7 @@ class OpRoomPlanning:
             print("Using ABS difference...")
             differences = []
             for p in sorted_p:
-                min_abs_diff = self.get_min_abs_diff(p)
+                min_abs_diff = self.calculate_min_abs_diff(p)
                 differences.append(min_abs_diff)
             print(f"\tdifferences: {differences}")
             max_diff = np.argmax(differences)
@@ -303,7 +355,10 @@ class OpRoomPlanning:
             p = sorted_p[max_diff]
             self.c2_schedule_patient(p)
 
-    def c2_heuristic(self):
+    def c2_heuristic(self) -> None:
+        """
+        Main implementation loop for C2-heuristic.
+        """
         iteration = 0
         self.calculate_lambda()
 
@@ -314,10 +369,11 @@ class OpRoomPlanning:
             print(f"\n--------Iteration {iteration}--------")
             print(f"\tScheduled end times: {[p.complete_time for p in self.scheduled]}")
 
-            intervals = self.get_invalid_intervals()
+            intervals = self.calculate_invalid_intervals()
             print(f"\tInvalid intervals: {intervals}")
             self.c2_iterate()
-        self.generate_c2_results()
+        self.print_c2_results()
+        self.print_bim_bii()
 
 
 def main():
@@ -365,8 +421,8 @@ def main():
     opr = OpRoomPlanning(op_ids, open_times, close_times,
                          p_ids, p_durations, p_op_rooms)
     # Choose one method
-    # opr.c1_heuristic()
-    opr.c2_heuristic()
+    opr.c1_heuristic()
+    # opr.c2_heuristic()
 
 
 if __name__ == "__main__":
